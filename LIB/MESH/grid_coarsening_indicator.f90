@@ -12,7 +12,7 @@
 !! -1 block wants to coarsen (ignoring other constraints, such as gradedness) \n
 !! -2 block will coarsen and be merged with her sisters \n
 ! ********************************************************************************************
-subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
+subroutine grid_coarsening_indicator( level, time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, &
     lgt_n, lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel, hvy_mask)
 
     use module_indicators
@@ -55,6 +55,9 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
     !> velocity of the solid
     real(kind=rk), allocatable, save :: us(:,:,:,:)
     logical :: consider_hvy_tmp
+    !> local variables to get the lgt id's of current level and rank
+    integer(kind=ik), allocatable                :: lgt_id_list(:),lgt_id_rank_list(:),lgt_id_spec_rank(:)
+
 
     ! in the default case we threshold all statevector components
     N_thresholding_components = params%n_eqn
@@ -196,46 +199,39 @@ subroutine grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tm
         endif
 
     case default
-        ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
-        ! notably because of the ghost nodes unit test, where random refinement / coarsening
-        ! is used. hence, checking the flag params%threshold_mask alone is not enough.
-        if (params%threshold_mask .and. present(hvy_mask)) then
-            ! loop over all my blocks
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
-                ! get lgt id of block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
+        ! get the lgt_id's of blocks with current level that is being refined
+        lgt_id_list = PACK([(k, k=1,size(lgt_block,DIM=1))],lgt_block( :, Jmax + IDX_MESH_LVL ) == level)
+        ! get the rank of the lgt_id's
+        lgt_id_rank_list = (lgt_id_list-1)/params%number_blocks
+        ! get the lgt_id's of current level on this specific rank
+        lgt_id_spec_rank = Pack(lgt_id_list,lgt_id_rank_list==params%rank)
 
-                ! some indicators may depend on the grid, hence
-                ! we pass the spacing and origin of the block (as we have to compute vorticity
-                ! here, this can actually be omitted.)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
+        ! now iterate through the lgt_id#s
+        do k = 1, size(lgt_id_spec_rank)
+            lgt_id = lgt_id_spec_rank(k)
+            ! get hvy id of block
+            call lgt2hvy(  hvy_id,lgt_id, params%rank, params%number_blocks )
 
+            ! some indicators may depend on the grid, hence
+            ! we pass the spacing and origin of the block (as we have to compute vorticity
+            ! here, this can actually be omitted.)
+            call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
+
+            ! NOTE: even if additional mask thresholding is used, passing the mask is optional,
+            ! notably because of the ghost nodes unit test, where random refinement / coarsening
+            ! is used. hence, checking the flag params%threshold_mask alone is not enough.
+            if (params%threshold_mask .and. present(hvy_mask)) then
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level, hvy_mask(:,:,:,:,hvy_id))
-            enddo
-        else
-            ! loop over all my blocks
-            do k = 1, hvy_n
-                hvy_id = hvy_active(k)
-                ! get lgt id of block
-                call hvy2lgt( lgt_id, hvy_id, params%rank, params%number_blocks )
-
-                ! some indicators may depend on the grid, hence
-                ! we pass the spacing and origin of the block (as we have to compute vorticity
-                ! here, this can actually be omitted.)
-                call get_block_spacing_origin( params, lgt_id, lgt_block, x0, dx )
-                level = lgt_block( lgt_id, params%max_treelevel+IDX_MESH_LVL)
-
+            else
                 ! evaluate the criterion on this block.
                 call block_coarsening_indicator( params, hvy_block(:,:,:,:,hvy_id), &
                 hvy_tmp(:,:,:,:,hvy_id), dx, x0, indicator, iteration, &
                 lgt_block(lgt_id, Jmax + IDX_REFINE_STS), norm, level)
-            enddo
-        endif
+            endif
+        end do
     end select
 
 

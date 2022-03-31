@@ -17,6 +17,8 @@
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
+    !use module_IO, only : write_field               ! IO module
+
     implicit none
 
     real(kind=rk), intent(in)           :: time
@@ -67,6 +69,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     ! MPI error variable
     integer(kind=ik)                    :: ierr, k1, hvy_id
     logical :: ignore_maxlevel2
+    ! level iterator loops from Jmax_active to Jmin_active for the levelwise coarsening
+    integer(kind=ik)                    :: Jmax_active, Jmin_active, level
+    ! indicator if data shall be saved after each level coarsening
+    logical                             :: write_levels
+
 
 
     ! start time
@@ -74,6 +81,12 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     t1 = t0
     lgt_n_old = 0
     iteration = 0
+    write_levels = .false.      ! save the data after each level coarsening. This can deactivate the normal data saving
+
+    Jmin_active = min_active_level( lgt_block, lgt_active, lgt_n )
+    Jmax_active = max_active_level( lgt_block, lgt_active, lgt_n )
+    level = Jmax_active
+
 
     if (present(ignore_maxlevel)) then
         ignore_maxlevel2 = ignore_maxlevel
@@ -88,10 +101,11 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
     call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
-    !> we iterate until the number of blocks is constant (note: as only coarsening
+    !! we iterate from the highest current level to the lowest current level and then iterate further
+    !! until the number of blocks is constant (note: as only coarsening
     !! is done here, no new blocks arise that could compromise the number of blocks -
     !! if it's constant, its because no more blocks are coarsened)
-    do while ( lgt_n_old /= lgt_n )
+    do while ((level>=Jmin_active) .or. (lgt_n_old /= lgt_n))        
         lgt_n_old = lgt_n
 
         !> (a) check where coarsening is possible
@@ -108,10 +122,10 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         if (params%threshold_mask .and. present(hvy_mask)) then
             ! if present, the mask can also be used for thresholding (and not only the state vector). However,
             ! as the grid changes within this routine, the mask will have to be constructed in grid_coarsening_indicator
-            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            call grid_coarsening_indicator( level, time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2, hvy_mask)
         else
-            call grid_coarsening_indicator( time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
+            call grid_coarsening_indicator( level, time, params, lgt_block, hvy_block, hvy_tmp, lgt_active, lgt_n, &
             lgt_sortednumlist, hvy_active, hvy_n, indicator, iteration, hvy_neighbor, ignore_maxlevel2)
         endif
         call toc( "adapt_mesh (grid_coarsening_indicator)", MPI_Wtime()-t0 )
@@ -160,12 +174,43 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
+        ! ! save the data for levelwise comparison
+        ! if (write_levels) then 
+        !     ! actual saving step. one file per component.
+        !     ! loop over components/qty's:
+        !     do k = 1, params%N_fields_saved
+
+        !         ! physics modules shall provide an interface for wabbit to know how to label
+        !         ! the components to be stored to hard disk (in the work array)
+        !         call FIELD_NAMES_meta(params%physics_type, k, tmp)
+
+        !         ! create filename
+        !         if (params%use_iteration_as_fileid) then
+        !             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
+        !             write(str_lvl,'(I2)') level
+        !             fname = str_lvl//fname
+        !         else
+        !             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+        !             write(str_lvl,'(I2)') level
+        !             fname = str_lvl//fname
+        !         endif
+        
+        !         ! actual writing
+        !         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
+        !         lgt_active, lgt_n, hvy_n, hvy_active)
+
+        !     end do
+        ! endif
+
         iteration = iteration + 1
 
         ! see description above in argument list.
         if (present(external_loop)) then
             if (external_loop) exit ! exit loop
         endif
+
+        level = level-1
+
     end do
 
     ! The grid adaptation is done now, the blocks that can be coarsened are coarser.
