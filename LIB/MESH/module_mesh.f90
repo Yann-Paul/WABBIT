@@ -104,15 +104,9 @@ contains
     ! transfer treecode to 3D hilbert code
 #include "treecode_to_hilbertcode_3D.f90"
 
-    ! goes back from a treecode to xyz cartesian coordinates
-!#include "get_block_spacing_origin.f90"
-
     ! find sisters to a given block
 #include "find_sisters.f90"
 
-    ! find globally coarsest / finest levels
-!#include "max_active_level.f90"
-!#include "min_active_level.f90"
 #include "get_free_local_light_id.f90"
 #include "quicksort.f90"
 #include "update_grid_metadata.f90"

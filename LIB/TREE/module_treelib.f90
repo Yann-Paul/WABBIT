@@ -8,8 +8,10 @@ contains
 #include "get_neighbor_treecode.f90"
 #include "lgt2hvy.f90"
 #include "hvy2lgt.f90"
+  ! find globally coarsest / finest levels
 #include "max_active_level.f90"
 #include "min_active_level.f90"
+  ! goes back from a treecode to xyz cartesian coordinates
 #include "get_block_spacing_origin.f90"
 
 !-----------------------------------------------------------------------------
