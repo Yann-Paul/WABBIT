@@ -1,10 +1,16 @@
 module module_treelib
 
   use module_globals
+  use module_params
 
 contains
 
 #include "get_neighbor_treecode.f90"
+#include "lgt2hvy.f90"
+#include "hvy2lgt.f90"
+#include "max_active_level.f90"
+#include "min_active_level.f90"
+#include "get_block_spacing_origin.f90"
 
 !-----------------------------------------------------------------------------
 !> \brief Computes the surface normal of the global domain boundary, if the current block is adjacent to the boundary.\n

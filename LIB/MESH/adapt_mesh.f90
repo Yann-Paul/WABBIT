@@ -17,7 +17,7 @@
 subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_active, lgt_n, &
     lgt_sortednumlist, hvy_active, hvy_n, tree_ID, indicator, hvy_tmp, hvy_mask, external_loop, ignore_maxlevel)
 
-    !use module_IO, only : write_field               ! IO module
+    use module_IO             ! IO module
 
     implicit none
 
@@ -50,6 +50,9 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
     integer(kind=ik), intent(inout)     :: hvy_n
     !> coarsening indicator
     character(len=*), intent(in)        :: indicator
+    ! file name
+    character(len=cshort)     :: fname, tmp
+    character(len=2) :: str_lvl
     !> Well, what now. The grid coarsening is an iterative process that runs until no more blocks can be
     !! coarsened. One iteration is not enough. If called without "external_loop", this routine
     !! performs this loop until it is converged. In some situations, this might be undesired, and
@@ -174,33 +177,33 @@ subroutine adapt_mesh( time, params, lgt_block, hvy_block, hvy_neighbor, lgt_act
         lgt_sortednumlist, hvy_active, hvy_n, tree_ID)
         call toc( "adapt_mesh (update neighbors)", MPI_Wtime()-t0 )
 
-        ! ! save the data for levelwise comparison
-        ! if (write_levels) then 
-        !     ! actual saving step. one file per component.
-        !     ! loop over components/qty's:
-        !     do k = 1, params%N_fields_saved
+        ! save the data for levelwise comparison
+        if (write_levels) then 
+            ! actual saving step. one file per component.
+            ! loop over components/qty's:
+            do k = 1, params%N_fields_saved
 
-        !         ! physics modules shall provide an interface for wabbit to know how to label
-        !         ! the components to be stored to hard disk (in the work array)
-        !         call FIELD_NAMES_meta(params%physics_type, k, tmp)
+                ! physics modules shall provide an interface for wabbit to know how to label
+                ! the components to be stored to hard disk (in the work array)
+                call FIELD_NAMES_meta(params%physics_type, k, tmp)
 
-        !         ! create filename
-        !         if (params%use_iteration_as_fileid) then
-        !             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
-        !             write(str_lvl,'(I2)') level
-        !             fname = str_lvl//fname
-        !         else
-        !             write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
-        !             write(str_lvl,'(I2)') level
-        !             fname = str_lvl//fname
-        !         endif
+                ! create filename
+                if (params%use_iteration_as_fileid) then
+                    write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), iteration
+                    write(str_lvl,'(I2)') level
+                    fname = str_lvl//fname
+                else
+                    write( fname,'(a, "_", i12.12, ".h5")') trim(adjustl(tmp)), nint(time * 1.0e6_rk)
+                    write(str_lvl,'(I2)') level
+                    fname = str_lvl//fname
+                endif
         
-        !         ! actual writing
-        !         call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
-        !         lgt_active, lgt_n, hvy_n, hvy_active)
+                ! actual writing
+                call write_field( fname, time, iteration, k, params, lgt_block, hvy_tmp, &
+                lgt_active, lgt_n, hvy_n, hvy_active)
 
-        !     end do
-        ! endif
+            end do
+        endif
 
         iteration = iteration + 1
 

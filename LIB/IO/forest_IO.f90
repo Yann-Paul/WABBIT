@@ -7,6 +7,9 @@
 subroutine read_field2tree(params, fnames, N_files, tree_id, tree_n, &
     lgt_block, lgt_active, lgt_n, lgt_sortednumlist, &
     hvy_block, hvy_active, hvy_n, hvy_tmp, hvy_neighbor, verbosity)
+
+    use module_mesh 
+
     implicit none
     !-----------------------------------------------------------------
     type (type_params), intent(inout) :: params           !< params structure
@@ -102,6 +105,9 @@ end subroutine read_field2tree
 !-------------------------------------------------------------------------------
 subroutine read_tree(fnames, N_files, params, lgt_n, lgt_block, hvy_block, hvy_tmp, &
     tree_id_optional, verbosity)
+    
+    use module_mesh 
+
     implicit none
 
     !-------------------------------- ---------------------------------
